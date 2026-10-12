@@ -337,7 +337,7 @@ export const CASES: EvalCase[] = [
       ...common(10, 0.03),
       {
         name: 'actually ran the command',
-        check: (t) => (t.toolCalls.some((c) => c.name === 'bash_tool' && /seq 1 30000/.test(String(c.args.comand ?? ''))) ? { pass: true } : { pass: false, detail: 'never ran it' }),
+        check: (t) => (t.toolCalls.some((c) => c.name === 'bash_tool' && /seq 1 30000/.test(String(c.args.command ?? ''))) ? { pass: true } : { pass: false, detail: 'never ran it' }),
       },
       finalTextMatches(/\b62875\b/, 'reports the true last line (30000 62875), which cannot be guessed'),
     ],

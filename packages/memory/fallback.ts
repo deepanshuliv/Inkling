@@ -1,5 +1,5 @@
 import { recentEventsKey, redis, sessionKey } from '@repo/redis';
-import type { LongTermMemory, MemoryMessage, MemoryStore, RecentEvent } from './types';
+import type { MemoryMessage, MemoryStore, RecentEvent } from './types';
 
 const MAX_HISTORY = 500;
 
@@ -48,14 +48,6 @@ export class RedisFallbackMemory implements MemoryStore {
       }
     }
     return out;
-  }
-
-    async searchLongTerm(): Promise<LongTermMemory[]> {
-    return [];
-  }
-
-    async rememberFact(projectId: string, text: string): Promise<void> {
-    console.log('[MEMORY_FALLBACK] long-term memory unavailable, dropping fact for', projectId, text.slice(0, 80));
   }
 
   async clearSession(projectId: string): Promise<void> {

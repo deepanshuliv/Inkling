@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { ContextBudgetManager } from '../runtime/contextBudget';
 import { OpenRouterProvider, setRetrySleep } from './openrouter';
 import { canonicalToolName, decodeMarkers, encodeMarkers, normalizeToolArgs } from './wire';
 import type { ProviderEvent } from './types';
@@ -60,7 +61,7 @@ afterEach(() => {
 });
 
 const TOOLS = [
-  { name: 'bash_tool', description: 'run', parameters: { type: 'object', properties: { comand: { type: 'string' } } } },
+  { name: 'bash_tool', description: 'run', parameters: { type: 'object', properties: { command: { type: 'string' } } } },
   { name: 'write_file', description: 'write', parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } } } },
   { name: 'edit_file', description: 'edit', parameters: { type: 'object', properties: { path: { type: 'string' }, target_content: { type: 'string' }, replacement_content: { type: 'string' } } } },
 ];
@@ -74,6 +75,7 @@ async function drive(provider: OpenRouterProvider, maxTurns = 6) {
     opening: 'build it',
     maxTurns,
     isCancelled: () => false,
+    contextBudget: new ContextBudgetManager({ modelContextCapacity: provider.contextWindow, responseReserve: 4_096 }),
     executeTool: async (name, args) => {
       executed.push({ name, args });
       return name === 'bash_tool' ? 'TOOL OUTPUT </think> and <tool_call>' : 'ok';
@@ -202,7 +204,7 @@ describe('malformed tool calls', () => {
       () => sse([text('ok'), finish('stop')]),
     );
     const { executed } = await drive(free());
-    expect(executed[0]!.args).toMatchObject({ comand: 'npm run typecheck' });
+    expect(executed[0]!.args).toMatchObject({ command: 'npm run typecheck' });
     expect(executed[1]!.args).toMatchObject({ path: 'a.ts', content: 'x' });
     expect(executed[2]!.args).toMatchObject({ target_content: 'x', replacement_content: 'y' });
   });
@@ -218,8 +220,8 @@ describe('malformed tool calls', () => {
 
   test('a tool call written as plain text is caught and the model is told to use the tool API', async () => {
     queue.push(
-      () => sse([text('<tool_call>\n{"name": "bash_tool", "arguments": {"comand": "ls"}}\n</tool_call>'), finish('stop')]),
-      () => sse([call(0, 'c1', 'bash_tool', '{"comand":"ls"}'), finish('tool_calls')]),
+      () => sse([text('<tool_call>\n{"name": "bash_tool", "arguments": {"command": "ls"}}\n</tool_call>'), finish('stop')]),
+      () => sse([call(0, 'c1', 'bash_tool', '{"command":"ls"}'), finish('tool_calls')]),
       () => sse([text('done'), finish('stop')]),
     );
     const { executed } = await drive(free());
@@ -231,11 +233,11 @@ describe('malformed tool calls', () => {
 describe('chat-protocol markers in code', () => {
   test('markers are encoded in everything sent to the model and decoded in tool arguments', async () => {
     queue.push(
-      () => sse([call(0, 'c1', 'bash_tool', '{"comand":"grep -n \\"‹/think›\\" lib/parse.ts"}'), finish('tool_calls')]),
+      () => sse([call(0, 'c1', 'bash_tool', '{"command":"grep -n \\"‹/think›\\" lib/parse.ts"}'), finish('tool_calls')]),
       () => sse([text('saw ‹tool_call›'), finish('stop')]),
     );
     const { events, executed } = await drive(free());
-    expect(executed[0]!.args.comand).toBe('grep -n "</think>" lib/parse.ts');
+    expect(executed[0]!.args.command).toBe('grep -n "</think>" lib/parse.ts');
     const sent = JSON.stringify(requests[1].messages);
     expect(sent).not.toContain('</think>');
     expect(sent).not.toContain('<tool_call>');
@@ -258,7 +260,7 @@ describe('chat-protocol markers in code', () => {
   });
 
   test('normalizeToolArgs keeps canonical names when both spellings are present', () => {
-    expect(normalizeToolArgs('bash_tool', { comand: 'a', command: 'b' })).toEqual({ comand: 'a' });
+    expect(normalizeToolArgs('bash_tool', { command: 'a', comand: 'b' })).toEqual({ command: 'a' });
   });
 });
 
@@ -278,7 +280,7 @@ describe('platform spend guard', () => {
   });
 
   test('a response that reports any cost stops the run before another request is made', async () => {
-    queue.push(() => sse([call(0, 'c1', 'bash_tool', '{"comand":"ls"}'), finish('tool_calls'), usage(0.0004)]));
+    queue.push(() => sse([call(0, 'c1', 'bash_tool', '{"command":"ls"}'), finish('tool_calls'), usage(0.0004)]));
     const { events, executed } = await drive(free());
     expect(requests).toHaveLength(1);
     expect(executed).toHaveLength(0);

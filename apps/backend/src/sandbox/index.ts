@@ -36,7 +36,7 @@ export type CommandResult = {
 let daytonaClient: Daytona | null = null;
 
 export function isSandboxConfigured(): boolean {
-  return Boolean(process.env.DAYTONA_API_KEY || process.env.DAYTON_API_KEY);
+  return Boolean(process.env.DAYTONA_API_KEY);
 }
 
 function getDaytona(): Daytona {
@@ -47,7 +47,7 @@ function getDaytona(): Daytona {
   }
 
   daytonaClient = new Daytona({
-    apiKey: process.env.DAYTONA_API_KEY || process.env.DAYTON_API_KEY,
+    apiKey: process.env.DAYTONA_API_KEY,
   });
   return daytonaClient;
 }

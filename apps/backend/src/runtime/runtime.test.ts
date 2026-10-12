@@ -8,7 +8,6 @@ import { InMemorySummaryRepository, summaryFromTaskState } from './summary';
 import { InMemoryTaskStateRepository, InvalidTaskStateTransitionError, TaskCompletionGuardError, TaskStateConflictError, TaskStateManager } from './taskState';
 import { InMemoryToolOutputRepository, ToolOutputManager } from './toolOutput';
 import { VerificationManager } from './verificationManager';
-import { SubagentContextManager, SubagentManager } from './subagentContext';
 import { OpenRouterProvider } from '../providers/openrouter';
 
 function makeState() {
@@ -201,34 +200,6 @@ describe('provider request invariant', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
-  });
-});
-
-describe('SubagentContextManager', () => {
-  test('passes selected state and returns bounded structured results without a transcript', async () => {
-    const states = await makeRunningState('subagent-task');
-    const state = await states.loadRequired('subagent-task');
-    const manager = new SubagentContextManager(new ContextBudgetManager({ modelContextCapacity: 2_000, responseReserve: 200, safetyReserve: 100 }));
-    const context = manager.build(state, { objective: 'Inspect auth flow', relevantFiles: ['src/auth.ts'], expectedOutput: 'findings and next step' });
-    expect(context.prompt).toContain('src/auth.ts');
-    expect('transcript' in context).toBe(false);
-    const result = manager.result({ findings: ['auth is generated'], files: ['src/auth.ts'], recommendedNextStep: 'do not edit middleware' });
-    expect(result.findings).toHaveLength(1);
-  });
-
-  test('many subagents produce bounded parent results with parent/child event correlation', async () => {
-    const states = await makeRunningState('many-subagents');
-    const state = await states.loadRequired('many-subagents');
-    const events = new InMemoryEventStore();
-    const contexts = new SubagentContextManager(new ContextBudgetManager({ modelContextCapacity: 2_000, responseReserve: 200, safetyReserve: 100 }));
-    const manager = new SubagentManager(contexts, events);
-    for (let index = 0; index < 24; index++) {
-      await manager.run(state, { objective: `research ${index}`, relevantFiles: ['src/auth.ts'], expectedOutput: 'short structured findings' }, async () => ({ findings: [`finding ${index}`], files: ['src/auth.ts'], recommendedNextStep: 'continue' }), { taskId: 'many-subagents', sessionId: 'session-1', runId: 'parent-run', parentAgentId: 'coordinator' });
-    }
-    const childEvents = events.eventsFor('session-1').filter((event) => event.type === 'subagent_finished');
-    expect(childEvents).toHaveLength(24);
-    expect(childEvents.every((event) => event.correlation.parentAgentId === 'coordinator')).toBe(true);
-    expect(JSON.stringify(childEvents)).not.toContain('transcript');
   });
 });
 

@@ -1,13 +1,9 @@
-import type { LongTermMemory, MemoryMessage, MemoryStore, RecentEvent } from './types';
+import type { MemoryMessage, MemoryStore, RecentEvent } from './types';
 
 type IrisMessage = { role: string; content: string; created_at?: string };
 
 type WorkingMemoryResponse = {
   messages?: IrisMessage[];
-};
-
-type SearchResponse = {
-  memories?: Array<{ text?: string; dist?: number; score?: number; topics?: string[] }>;
 };
 
 export class IrisMemory implements MemoryStore {
@@ -96,46 +92,6 @@ export class IrisMemory implements MemoryStore {
       content: m.content,
       createdAt: m.created_at,
     }));
-  }
-
-  async searchLongTerm(projectId: string, query: string, limit: number): Promise<LongTermMemory[]> {
-    try {
-      const data = await this.request<SearchResponse>('/v1/long-term-memory/search', {
-        method: 'POST',
-        body: JSON.stringify({
-          text: query,
-          limit,
-          namespace: { eq: this.namespace },
-          session_id: { eq: projectId },
-        }),
-      });
-
-      return (data.memories ?? []).map((m) => ({
-        text: m.text ?? '',
-        score: m.score ?? (typeof m.dist === 'number' ? 1 - m.dist : undefined),
-        topics: m.topics,
-      }));
-    } catch (error) {
-      console.log('[IRIS_SEARCH] , ', error);
-      return [];
-    }
-  }
-
-  async rememberFact(projectId: string, text: string, topics: string[] = []): Promise<void> {
-    await this.request('/v1/long-term-memory/', {
-      method: 'POST',
-      body: JSON.stringify({
-        memories: [
-          {
-            text,
-            session_id: projectId,
-            namespace: this.namespace,
-            memory_type: 'semantic',
-            topics,
-          },
-        ],
-      }),
-    });
   }
 
   async clearSession(projectId: string): Promise<void> {

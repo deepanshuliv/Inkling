@@ -1,18 +1,7 @@
-import { randomUUIDv7 } from 'bun';
 import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 import { prisma } from '@repo/db';
-import {
-  acquireProjectLock,
-  clearLiveness,
-  connectToRedis,
-  keysForRequest,
-  projectForQuestion,
-  publishAnswer,
-  releaseProjectLock,
-  startHeartbeat,
-  touchLiveness,
-} from '@repo/redis';
+import { connectToRedis, keysForRequest, projectForQuestion, publishAnswer } from '@repo/redis';
 import { createMemoryStore } from '@repo/memory';
 import { isStorageConfigured } from '@repo/storage';
 import { runAgent } from './src/agent';
@@ -26,15 +15,11 @@ import { startReconciler } from './src/reconciler';
 import { startPreviewProxy } from './src/previewProxy';
 import { flushRecentEvents } from './src/utils/recentEvents';
 import { isAuthConfigured, requireAuth, requireProjectAccess } from './src/auth';
-import {
-  BACKEND_ID,
-  HISTORY_PAGE_SIZE,
-  PORT,
-  STRICT_OWNERSHIP,
-  TEMPLATE_SOURCE,
-} from './src/config';
+import { BACKEND_ID, HISTORY_PAGE_SIZE, PORT, TEMPLATE_SOURCE } from './src/config';
+import { leaseProject } from './src/projectLease';
+import { getGithubToken, getGithubIdentity, isRepositoryEmpty, listRepositories, createRepository, pushToGitHub, createOrUpdatePullRequest } from './src/github';
 import { createEmitter, emitDetached } from './src/utils/events';
-import { BYOK_MODELS, describeProvider, PLATFORM_FREE_ONLY, type ProviderOverride } from './src/providers';
+import { BYOK_MODELS, describeProvider, type ProviderOverride } from './src/providers';
 import { DAILY_LIMIT_MESSAGE, freeDailyQuotaExhausted } from './src/freeQuota';
 import { deriveTitle, fallbackTitle, generateProjectTitle, looksLikePrompt } from './src/utils/naming';
 import {
@@ -46,7 +31,7 @@ import {
   loadUserKey,
   saveUserKey,
 } from './src/userKeys';
-import type { AgentMode } from './src/sytemPrompt';
+import type { AgentMode } from './src/systemPrompt';
 import { param } from './src/utils/http';
 import {
   attachProject,
@@ -73,10 +58,6 @@ import {
   type SecretSummary,
 } from './src/utils/secrets';
 
-function lockHolder(): string {
-  return `${BACKEND_ID}:${randomUUIDv7()}`;
-}
-
 const activeRuns = new Map<string, () => void>();
 
 function onClientGone(req: Request, res: Response, callback: () => void) {
@@ -101,6 +82,14 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:3001')
 const CORS_ANY = ALLOWED_ORIGINS.includes('*');
 
 app.use(cors({ origin: CORS_ANY ? '*' : ALLOWED_ORIGINS }));
+
+function openEventStream(res: Response) {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+}
 
 await connectToRedis();
 const memory = createMemoryStore();
@@ -187,22 +176,18 @@ app.delete('/projects/:projectId', requireProjectAccess, async (req: Request, re
   const projectId = param(req, 'projectId');
   if (!projectId) return res.status(400).json({ msg: 'please provide valid projectId' });
 
-  const holder = lockHolder();
-  const lock = await acquireProjectLock(projectId, holder, !STRICT_OWNERSHIP);
-  if (!lock.ok) {
+  const leased = await leaseProject(projectId);
+  if (!leased.ok) {
     return res.status(409).json({ msg: 'this project is currently running' });
   }
-
-  await touchLiveness(projectId);
-  const stopHeartbeat = startHeartbeat(projectId, holder, () => {});
+  const { lease } = leased;
+  lease.watch(() => {});
 
   try {
     await deleteProject(projectId);
     res.status(204).end();
   } finally {
-    stopHeartbeat();
-    await clearLiveness(projectId).catch(() => {});
-    await releaseProjectLock(projectId, holder);
+    await lease.release();
   }
 });
 
@@ -291,50 +276,31 @@ app.post('/chat/:projectId', requireProjectAccess, async (req: Request, res: Res
     }
   }
 
-  if (!byok && PLATFORM_FREE_ONLY && (await freeDailyQuotaExhausted())) {
+  if (!byok && (await freeDailyQuotaExhausted())) {
     return res.status(503).json({
       msg: friendlyError(DAILY_LIMIT_MESSAGE),
       code: 'free_daily_limit',
     });
   }
 
-  const forcePlatformProvider = byok || !process.env.OPENROUTER_API_KEY ? undefined : 'openrouter';
-
-  const holder = lockHolder();
-  const lock = await acquireProjectLock(projectId, holder, !STRICT_OWNERSHIP);
-  if (!lock.ok) {
+  const leased = await leaseProject(projectId);
+  if (!leased.ok) {
     return res.status(409).json({
       msg: 'this project is being worked on by another session',
-      ownerId: lock.ownerId,
+      ownerId: leased.ownerId,
     });
   }
+  const { lease } = leased;
+  const { holder } = lease;
 
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Content-Type', 'text/event-stream');
-
-  const requestOrigin = req.headers.origin;
-  if (CORS_ANY) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  } else if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) {
-    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Connection', 'keep-alive');
-
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
-  await touchLiveness(projectId);
-
+  openEventStream(res);
   const emitter = createEmitter(projectId, res);
 
-    let cancelled = false;
-  let ownsProject = true;
+  let cancelled = false;
 
-  const stopHeartbeat = startHeartbeat(projectId, holder, () => {
+  lease.watch(() => {
     console.log('[LOCK_LOST] , ', projectId);
     cancelled = true;
-    ownsProject = false;
     emitter.stream('error', { message: 'lost ownership of this project' });
     detachProject(projectId);
     emitter.close();
@@ -370,10 +336,9 @@ app.post('/chat/:projectId', requireProjectAccess, async (req: Request, res: Res
         emitter,
         replayed,
         isCancelled: () => cancelled,
-        ownsProject: () => ownsProject,
+        ownsProject: lease.owned,
         mode,
         byok,
-        forcePlatformProvider,
         budgetMicros,
         onProvider: (provider) => {
           if (byok) return;
@@ -406,13 +371,8 @@ app.post('/chat/:projectId', requireProjectAccess, async (req: Request, res: Res
   } finally {
     clearInterval(usageTimer);
     if (!byok) await clearInflightUsage(req.userId!, holder).catch(() => {});
-    stopHeartbeat();
     if (activeRuns.get(projectId) === cancelRun) activeRuns.delete(projectId);
-
-    if (ownsProject) {
-      await clearLiveness(projectId).catch(() => {});
-      await releaseProjectLock(projectId, holder).catch(() => {});
-    }
+    await lease.release();
     await flushRecentEvents(projectId).catch(() => {});
     if (completed) await emitter.emit('done', {});
     emitter.close();
@@ -752,34 +712,19 @@ app.post('/projects/:projectId/wake', requireProjectAccess, async (req: Request,
   if (!projectId) return res.status(400).json({ msg: 'please provide valid projectId' });
   await markPresent(projectId);
 
-  const holder = lockHolder();
-  const lock = await acquireProjectLock(projectId, holder, !STRICT_OWNERSHIP);
-  if (!lock.ok) {
+  const leased = await leaseProject(projectId);
+  if (!leased.ok) {
     return res.status(409).json({
       msg: 'this project is being worked on by another session',
-      ownerId: lock.ownerId,
+      ownerId: leased.ownerId,
     });
   }
+  const { lease } = leased;
 
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Content-Type', 'text/event-stream');
-  const requestOrigin = req.headers.origin;
-  if (CORS_ANY) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  } else if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) {
-    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
-  await touchLiveness(projectId);
+  openEventStream(res);
   const emitter = createEmitter(projectId, res);
 
-  let ownsProject = true;
-  const stopHeartbeat = startHeartbeat(projectId, holder, () => {
-    ownsProject = false;
+  lease.watch(() => {
     emitter.stream('error', { message: 'lost ownership of this project' });
     detachProject(projectId);
     emitter.close();
@@ -795,17 +740,12 @@ app.post('/projects/:projectId/wake', requireProjectAccess, async (req: Request,
   } catch (error) {
     console.log('[WAKE_FAILED] , ', String(error).slice(0, 200));
   } finally {
-    stopHeartbeat();
-    if (ownsProject) {
-      await clearLiveness(projectId).catch(() => {});
-      await releaseProjectLock(projectId, holder);
-      if (!attached) detachProject(projectId);
-    }
+    const owned = lease.owned();
+    await lease.release();
+    if (owned && !attached) detachProject(projectId);
     emitter.close();
   }
 });
-
-import { getGithubToken, getGithubIdentity, isRepositoryEmpty, listRepositories, createRepository, pushToGitHub, createOrUpdatePullRequest } from './src/github';
 
 app.get('/github/status', requireAuth, async (req: Request, res: Response) => {
   const token = await getGithubToken(req.userId!);
@@ -855,13 +795,14 @@ app.post('/projects/:projectId/github/push', requireProjectAccess, async (req: R
     return res.status(400).json({ msg: 'repository (owner/repo) is required' });
   }
 
-  const holder = lockHolder();
-  const lock = await acquireProjectLock(projectId, holder, !STRICT_OWNERSHIP);
-  if (!lock.ok) {
-    return res.status(409).json({ msg: 'this project is currently running', ownerId: lock.ownerId });
+  const leased = await leaseProject(projectId);
+  if (!leased.ok) {
+    return res.status(409).json({ msg: 'this project is currently running', ownerId: leased.ownerId });
   }
-
-  await touchLiveness(projectId);
+  const { lease } = leased;
+  lease.watch(() => {
+    detachProject(projectId);
+  });
 
   try {
     let conn = await prisma.githubConnection.findUnique({ where: { projectId } });
@@ -890,13 +831,8 @@ app.post('/projects/:projectId/github/push', requireProjectAccess, async (req: R
       close: () => {},
     };
 
-    const stopHeartbeat = startHeartbeat(projectId, holder, () => {
-      detachProject(projectId);
-    });
-
-    let attach;
     try {
-      attach = await attachProject(projectId, dummyEmitter);
+      const attach = await attachProject(projectId, dummyEmitter);
 
       const author = await getGithubIdentity(token);
       const { commitSha } = await pushToGitHub(attach.entry, repository, branch, token, author, branch !== 'main');
@@ -913,12 +849,9 @@ app.post('/projects/:projectId/github/push', requireProjectAccess, async (req: R
       const message = String(e?.message || 'Failed to push to GitHub').split(token).join('***');
       console.log('[GITHUB_PUSH_ERROR]', message);
       res.status(500).json({ msg: friendlyError(message) });
-    } finally {
-      stopHeartbeat();
     }
   } finally {
-    await clearLiveness(projectId).catch(() => {});
-    await releaseProjectLock(projectId, holder);
+    await lease.release();
   }
 });
 

@@ -130,7 +130,6 @@ async function ensureImage() {
 
 const serviceEnv = {
   ...process.env,
-  MODEL_PROVIDER: 'openrouter',
   OPENROUTER_MODEL: EVAL_MODEL,
   OPENROUTER_FALLBACK_MODELS: EVAL_FALLBACKS.join(','),
   EVAL_JUDGE_MODEL: process.env.EVAL_JUDGE_MODEL || EVAL_MODEL,

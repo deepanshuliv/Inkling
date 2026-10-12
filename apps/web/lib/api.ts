@@ -197,6 +197,34 @@ export async function reportClientErrors(
 
 export type ChatStreamHandle = { abort: () => void };
 
+async function readEventStream(body: ReadableStream<Uint8Array>, onEvent: (event: StreamEvent) => void) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary !== -1) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf('\n\n');
+
+      const line = frame.split('\n').find((l) => l.startsWith('data: '));
+      if (!line) continue;
+
+      try {
+        onEvent(JSON.parse(line.slice(6)) as StreamEvent);
+      } catch {
+      }
+    }
+  }
+}
+
 export function openChatStream(
   token: Token,
   projectId: string,
@@ -246,31 +274,7 @@ export function openChatStream(
         return;
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        let boundary = buffer.indexOf('\n\n');
-        while (boundary !== -1) {
-          const frame = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-          boundary = buffer.indexOf('\n\n');
-
-          const line = frame.split('\n').find((l) => l.startsWith('data: '));
-          if (!line) continue;
-
-          try {
-            onEvent(JSON.parse(line.slice(6)) as StreamEvent);
-          } catch {
-          }
-        }
-      }
+      await readEventStream(response.body, onEvent);
 
       finished = true;
       onClose();
@@ -356,31 +360,7 @@ export function wakeProjectStream(
         return;
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        let boundary = buffer.indexOf('\n\n');
-        while (boundary !== -1) {
-          const frame = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-          boundary = buffer.indexOf('\n\n');
-
-          const line = frame.split('\n').find((l) => l.startsWith('data: '));
-          if (!line) continue;
-
-          try {
-            onEvent(JSON.parse(line.slice(6)) as StreamEvent);
-          } catch {
-          }
-        }
-      }
+      await readEventStream(response.body, onEvent);
 
       onClose();
     } catch (error) {

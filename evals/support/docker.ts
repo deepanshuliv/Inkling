@@ -1,5 +1,5 @@
-export const EVAL_IMAGE = process.env.EVAL_SANDBOX_IMAGE || 'my-lovable-eval-sandbox';
-export const EVAL_LABEL = 'my-lovable-eval=1';
+export const EVAL_IMAGE = process.env.EVAL_SANDBOX_IMAGE || 'inkling-eval-sandbox';
+export const EVAL_LABEL = 'inkling-eval=1';
 export const WORKSPACE = '/workspace';
 
 export type DockerResult = { exitCode: number; output: string; bytes: Uint8Array };

@@ -48,8 +48,3 @@ export async function loadRecentEvents(projectId: string, limit = RECENT_EVENTS_
     return [];
   }
 }
-
-export function unpersistedTail<T extends { seq: number }>(persisted: T[], recent: RecentEvent[]): RecentEvent[] {
-  const highest = persisted.reduce((max, event) => Math.max(max, event.seq), 0);
-  return recent.filter((event) => event.seq > highest);
-}

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-const TAG = 'my-lovable:client-errors';
+const TAG = 'inkling:client-errors';
 
 const FLUSH_MS = 500;
 const MAX_BATCH = 20;

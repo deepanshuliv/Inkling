@@ -1,12 +1,6 @@
 export * from './events';
 export * from './redact';
 
-export function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`missing required env var: ${name}`);
-  return value;
-}
-
 export function envOr(name: string, fallback: string): string {
   return process.env[name] || fallback;
 }

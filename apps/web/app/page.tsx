@@ -7,7 +7,7 @@ import LimeLanding from '@/components/landing/LimeLanding';
 import { createProject } from '@/lib/api';
 import { useToken } from '@/lib/useToken';
 
-const PENDING_KEY = 'my-lovable.pending-prompt';
+const PENDING_KEY = 'inkling.pending-prompt';
 
 export default function Landing() {
   const router = useRouter();

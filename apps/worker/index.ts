@@ -1,11 +1,12 @@
 import { randomUUIDv7 } from 'bun';
 import { prisma } from '@repo/db';
-import { connectToRedis, duplicateClient, ensureConsumerGroup, EVENTS_GROUP, EVENTS_STREAM } from '@repo/redis';
+import { connectToRedis, duplicateClient, ensureConsumerGroup, EVENTS_GROUP, EVENTS_STREAM, trimPersistedEvents } from '@repo/redis';
 import { envInt } from '@repo/shared';
 
 const BATCH_SIZE = envInt('WORKER_BATCH_SIZE', 100);
 const BLOCK_MS = envInt('WORKER_BLOCK_MS', 5000);
 const CLAIM_IDLE_MS = envInt('WORKER_CLAIM_IDLE_MS', 60_000);
+const TRIM_INTERVAL_MS = envInt('WORKER_TRIM_INTERVAL_MS', 60_000);
 
 const CONSUMER = process.env.WORKER_ID || `worker-${randomUUIDv7()}`;
 
@@ -136,6 +137,20 @@ async function reclaimStale(client: Awaited<ReturnType<typeof duplicateClient>>)
   }
 }
 
+let lastTrim = 0;
+
+async function trimIfDue(client: Awaited<ReturnType<typeof duplicateClient>>) {
+  const now = Date.now();
+  if (now - lastTrim < TRIM_INTERVAL_MS) return;
+  lastTrim = now;
+  try {
+    const removed = await trimPersistedEvents(client);
+    if (removed > 0) console.log(`[WORKER] trimmed ${removed} persisted entries from ${EVENTS_STREAM}`);
+  } catch (error) {
+    console.log('[WORKER_TRIM_ERROR] , ', String(error).slice(0, 200));
+  }
+}
+
 async function main() {
   await connectToRedis();
   await ensureConsumerGroup();
@@ -171,6 +186,7 @@ async function main() {
 
       if (entries.length === 0) {
         await reclaimStale(client);
+        await trimIfDue(client);
         continue;
       }
 
@@ -180,6 +196,7 @@ async function main() {
         await client.xAck(EVENTS_STREAM, EVENTS_GROUP, acked);
         console.log(`[WORKER] persisted ${acked.length} events`);
       }
+      await trimIfDue(client);
     } catch (error) {
       retryOwnPending = true;
       console.log('[WORKER_ERROR] , ', String(error).slice(0, 300));

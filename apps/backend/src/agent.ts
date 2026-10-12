@@ -16,9 +16,9 @@ import {
 } from './config';
 import type { Emitter } from './utils/events';
 import { getProvider, type ModelProvider, type ProviderOverride } from './providers';
-import { promptForMode, type AgentMode } from './sytemPrompt';
+import { promptForMode, type AgentMode } from './systemPrompt';
 import { toolsForMode } from './tools/toolSchema';
-import { toolCall, type RequiredSecret } from './tools/toolDefintion';
+import { toolCall, type RequiredSecret } from './tools/toolDefinition';
 import { findImagesBatch } from './tools/images';
 import { describeKey } from './keyVerification';
 import { requestKeys as runKeyRequest } from './keyRequest';
@@ -65,7 +65,6 @@ export type AgentContext = {
     ownsProject?: () => boolean;
     mode?: AgentMode;
     byok?: ProviderOverride;
-    forcePlatformProvider?: 'openrouter' | 'gemini';
     budgetMicros?: number;
     onProvider?: (provider: ModelProvider) => void;
 };
@@ -151,7 +150,7 @@ async function getClientErrors(projectId: string): Promise<string | undefined> {
 export async function runAgent(context: AgentContext, query: string) {
   const { projectId, emitter } = context;
   const mode = context.mode ?? 'build';
-  const provider = getProvider(context.byok, context.forcePlatformProvider);
+  const provider = getProvider(context.byok);
   context.onProvider?.(provider);
   const runtime = new AgentRuntime({ projectId, emitter, provider });
   await runtime.start(query);
@@ -239,7 +238,7 @@ export async function runAgent(context: AgentContext, query: string) {
           emitter.stream('running', { stage: 'Finding photos…' });
         } else if (name === 'bash_tool') {
           ranCommands = true;
-          const cmd = String((args as any)?.comand || (args as any)?.command || '').trim();
+          const cmd = String((args as any)?.command || '').trim();
           const shortCmd = cmd.split('\n')[0]?.slice(0, 40) ?? 'command';
           emitter.stream('running', { stage: `Executing: ${shortCmd}…` });
         } else if (name === 'question_tool') {
@@ -258,7 +257,7 @@ export async function runAgent(context: AgentContext, query: string) {
                 runtime.sessionId,
               ).catch((error) => `ERROR: ${String(error).slice(0, 400)}`)
             : await executeTool(context, name, args, callId, mode, askedQuestions);
-          const command = typeof args.command === 'string' ? args.command : typeof args.comand === 'string' ? args.comand : undefined;
+          const command = typeof args.command === 'string' ? args.command : undefined;
           const code = writtenCodeFromArgs(name, args);
           if (code) writtenCode.push(code);
           if (code && typeof args.path === 'string' && !raw.startsWith('ERROR')) writtenPaths.add(args.path);
@@ -286,7 +285,7 @@ export async function runAgent(context: AgentContext, query: string) {
           if (touchesInternalSkills(event.args)) hiddenCalls.add(event.id);
           else await emitter.emit('tool_call', { name: event.name, args: event.args });
           await runtime.record('tool_requested', { name: event.name, args: event.args, callId: event.id });
-          console.log(`\n⚙ ${event.name}  ${(event.args as any).comand ?? JSON.stringify(event.args)}`);
+          console.log(`\n⚙ ${event.name}  ${(event.args as any).command ?? JSON.stringify(event.args)}`);
           if (['write_file', 'edit_file'].includes(event.name) && typeof event.args.path === 'string') {
             const state = await runtime.states.loadRequired(projectId);
             if (!state.filesTouched.includes(event.args.path)) {
@@ -713,7 +712,7 @@ async function executeTool(
   }
 
   if (name === 'bash_tool') {
-    return await toolCall.bash_tool(context.projectId, String(args.comand ?? args.command ?? ''), mode);
+    return await toolCall.bash_tool(context.projectId, String(args.command ?? ''), mode);
   }
 
   if (name === 'request_api_keys') {

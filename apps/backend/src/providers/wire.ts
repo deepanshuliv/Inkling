@@ -19,7 +19,7 @@ export function decodeArgs(value: unknown): unknown {
 }
 
 const ALIASES: Record<string, Record<string, string[]>> = {
-  bash_tool: { comand: ['command', 'cmd', 'script'] },
+  bash_tool: { command: ['comand', 'cmd', 'script'] },
   write_file: { path: ['file_path', 'filepath', 'filePath', 'file', 'filename'], content: ['contents', 'code', 'text', 'file_content'] },
   edit_file: {
     path: ['file_path', 'filepath', 'filePath', 'file', 'filename'],

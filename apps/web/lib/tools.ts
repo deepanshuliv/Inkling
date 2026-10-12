@@ -23,7 +23,7 @@ export function toolTarget(name: string, args: Record<string, unknown> | undefin
   if (kind === 'images' && Array.isArray(args?.queries)) return args.queries.map(String).join(', ');
   if (kind === 'search' || kind === 'images') return String(args?.query ?? '');
   if (kind === 'run') {
-    const command = String(args?.comand ?? args?.command ?? '').trim();
+    const command = String(args?.command ?? args?.comand ?? '').trim();
     return command.split('\n')[0] ?? command;
   }
   return args ? JSON.stringify(args).slice(0, 80) : name;
@@ -42,10 +42,6 @@ const VERBS: Record<ToolKind, [string, string]> = {
 
 export function toolVerb(kind: ToolKind, pending: boolean): string {
   return VERBS[kind][pending ? 0 : 1];
-}
-
-export function toolStatus(name: string, target: string): string {
-  return `${toolVerb(toolKind(name), true)} ${target}`;
 }
 
 export function showsOutput(name: string, isError: boolean | undefined): boolean {

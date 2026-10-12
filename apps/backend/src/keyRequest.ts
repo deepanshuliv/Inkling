@@ -1,5 +1,5 @@
 import type { KeyCheck, KeyInfo } from './keyVerification';
-import type { RequiredSecret } from './tools/toolDefintion';
+import type { RequiredSecret } from './tools/toolDefinition';
 
 export const DESIGN_ONLY_ANSWER = 'Yes, design my website';
 

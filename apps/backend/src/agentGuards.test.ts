@@ -61,9 +61,9 @@ test('repairOpening carries the request, the errors and the files', () => {
 describe('repeated command failures', () => {
   test('the same failing command twice triggers a rewrite-or-read hint', () => {
     const tracker = new FailureTracker();
-    expect(tracker.observe('bash_tool', { comand: 'npm run typecheck' }, 'ERROR: exit 2')).toBeNull();
+    expect(tracker.observe('bash_tool', { command: 'npm run typecheck' }, 'ERROR: exit 2')).toBeNull();
     tracker.observe('read_file', { path: 'app/page.tsx' }, '1: x');
-    expect(tracker.observe('bash_tool', { comand: 'npm  run typecheck' }, 'ERROR: exit 2')).toContain('failed 2 times');
+    expect(tracker.observe('bash_tool', { command: 'npm  run typecheck' }, 'ERROR: exit 2')).toContain('failed 2 times');
   });
 });
 
@@ -85,11 +85,11 @@ describe('routesForFiles', () => {
 
 test('re-running the same passing command without changes gets a finish-or-change hint', () => {
   const tracker = new FailureTracker();
-  expect(tracker.observe('bash_tool', { comand: 'npm run typecheck' }, 'ok')).toBeNull();
-  expect(tracker.observe('bash_tool', { comand: 'npm run typecheck' }, 'ok')).toBeNull();
-  expect(tracker.observe('bash_tool', { comand: 'npm run typecheck' }, 'ok')).toContain('3 times with no file changes');
+  expect(tracker.observe('bash_tool', { command: 'npm run typecheck' }, 'ok')).toBeNull();
+  expect(tracker.observe('bash_tool', { command: 'npm run typecheck' }, 'ok')).toBeNull();
+  expect(tracker.observe('bash_tool', { command: 'npm run typecheck' }, 'ok')).toContain('3 times with no file changes');
   tracker.observe('edit_file', { path: 'a.ts' }, 'Successfully updated a.ts');
-  expect(tracker.observe('bash_tool', { comand: 'npm run typecheck' }, 'ok')).toBeNull();
+  expect(tracker.observe('bash_tool', { command: 'npm run typecheck' }, 'ok')).toBeNull();
 });
 
 describe('parseQuestions', () => {
@@ -110,7 +110,7 @@ describe('parseQuestions', () => {
 
 describe('clientDirectiveWarning', () => {
   test('flags interactive components without use client and stays quiet otherwise', async () => {
-    const { clientDirectiveWarning } = await import('./tools/toolDefintion');
+    const { clientDirectiveWarning } = await import('./tools/toolDefinition');
     expect(clientDirectiveWarning('app/pricing/page.tsx', 'export default function P() { return <button onClick={() => 1}>Buy</button>; }')).toContain("'use client'");
     expect(clientDirectiveWarning('components/Todo.tsx', "import { useState } from 'react';\nexport function T() { const [a] = useState(1); return a; }")).toContain("'use client'");
     expect(clientDirectiveWarning('app/pricing/page.tsx', "'use client';\nexport default function P() { return <button onClick={() => 1}>Buy</button>; }")).toBeNull();
@@ -134,7 +134,7 @@ describe('routesFromRequest', () => {
 
 describe('normalizeProjectPath', () => {
   test('turns absolute and stripped-absolute paths into project-relative ones', async () => {
-    const { normalizeProjectPath } = await import('./tools/toolDefintion');
+    const { normalizeProjectPath } = await import('./tools/toolDefinition');
     expect(normalizeProjectPath('/workspace/app/app/page.tsx', '/workspace/app')).toBe('app/page.tsx');
     expect(normalizeProjectPath('workspace/app/components/Footer.tsx', '/workspace/app')).toBe('components/Footer.tsx');
     expect(normalizeProjectPath('./lib/menu.ts', '/workspace/app')).toBe('lib/menu.ts');
@@ -144,7 +144,7 @@ describe('normalizeProjectPath', () => {
 });
 
 test('serverFetchWarning flags relative fetches in server files only', async () => {
-  const { serverFetchWarning } = await import('./tools/toolDefintion');
+  const { serverFetchWarning } = await import('./tools/toolDefinition');
   expect(serverFetchWarning('app/(dashboard)/dashboard/users/page.tsx', "export default async function P() { const r = await fetch('/api/users'); return null; }")).toContain('Failed to parse URL');
   expect(serverFetchWarning('app/page.tsx', "'use client';\nexport default function P() { fetch('/api/tasks'); return null; }")).toBeNull();
   expect(serverFetchWarning('app/page.tsx', "export default async function P() { await fetch('https://api.example.com/x'); return null; }")).toBeNull();
@@ -152,7 +152,7 @@ test('serverFetchWarning flags relative fetches in server files only', async () 
 });
 
 test('devServerCommandError blocks killing or restarting the dev server but not normal commands', async () => {
-  const { devServerCommandError } = await import('./tools/toolDefintion');
+  const { devServerCommandError } = await import('./tools/toolDefinition');
   for (const bad of ['pkill -f "next dev"', 'pkill -9 -f node || true', 'killall node', 'kill $(lsof -t -i:3000)', 'kill -9 -1', 'fuser -k 3000/tcp', 'npm run dev', 'cd app && npx next dev -p 3001', '(nohup npm run dev > /tmp/x &)']) {
     expect(devServerCommandError(bad)).not.toBeNull();
   }
@@ -183,7 +183,7 @@ describe('route feedback', () => {
 });
 
 test('routeFileOutsideAppError catches route files written outside app/', async () => {
-  const { routeFileOutsideAppError } = await import('./tools/toolDefintion');
+  const { routeFileOutsideAppError } = await import('./tools/toolDefinition');
   expect(routeFileOutsideAppError('(dashboard)/layout.tsx')).toContain('app/(dashboard)/layout.tsx');
   expect(routeFileOutsideAppError('api/settings/route.ts')).toContain('app/api/settings/route.ts');
   expect(routeFileOutsideAppError('dashboard/page.tsx')).toContain('app/dashboard/page.tsx');
@@ -194,7 +194,7 @@ test('routeFileOutsideAppError catches route files written outside app/', async 
 
 test('alias import hints point at the misplaced file', async () => {
   const { unresolvedAliasImports, aliasHints } = await import('./agentGuards');
-  const { helperLocationNote } = await import('./tools/toolDefintion');
+  const { helperLocationNote } = await import('./tools/toolDefinition');
   const output = "app/(dashboard)/dashboard/page.tsx(1,39): error TS2307: Cannot find module '@/lib/data' or its corresponding type declarations.";
   const missing = unresolvedAliasImports(output);
   expect(missing).toEqual(['lib/data']);

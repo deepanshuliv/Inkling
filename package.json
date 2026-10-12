@@ -18,7 +18,7 @@
     "db:generate": "prisma generate --schema packages/db/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema packages/db/prisma/schema.prisma",
     "db:push": "prisma db push --schema packages/db/prisma/schema.prisma",
-    "db:sync": "prisma db push --schema packages/db/prisma/schema.prisma",
+    "db:sync": "bun packages/db/migrate.ts",
     "bake:snapshot": "bun scripts/bake-snapshot.ts",
     "infra:up": "docker compose up -d --build",
     "infra:down": "docker compose down",

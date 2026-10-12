@@ -2,7 +2,6 @@ import {
   createFileOps,
   estimateTokens,
   findCutPoint,
-  isOverThreshold,
   summarize,
   trackFileOps,
   type ConversationPart,
@@ -296,7 +295,6 @@ export class OpenRouterProvider implements ModelProvider {
   }
 
   private requestFits(messages: ChatMessage[], tools: ToolSpec[], budget: RunOptions['contextBudget']): boolean {
-    if (!budget) return !isOverThreshold(this.estimate(messages), this.contextWindow);
     return !budget.shouldCompact(this.estimate(messages), estimateTokens(JSON.stringify(tools)));
   }
 
@@ -347,10 +345,7 @@ export class OpenRouterProvider implements ModelProvider {
     tools: ToolSpec[],
     budget: RunOptions['contextBudget'],
   ): AsyncGenerator<ProviderEvent, void> {
-    const needsCompaction = budget
-      ? budget.shouldCompact(this.estimate(state.messages), estimateTokens(JSON.stringify(tools)))
-      : isOverThreshold(this.estimate(state.messages), this.contextWindow);
-    if (!needsCompaction) return;
+    if (!budget.shouldCompact(this.estimate(state.messages), estimateTokens(JSON.stringify(tools)))) return;
 
     yield* this.compact(state, midStream, false);
 
@@ -377,9 +372,7 @@ export class OpenRouterProvider implements ModelProvider {
         pass.assistantText += delta.content;
         yield { type: 'text_delta', text: decodeMarkers(delta.content) };
 
-        if (contextBudget
-          ? contextBudget.shouldCompact(baseTokens + estimateTokens(pass.assistantText), estimateTokens(JSON.stringify(tools)))
-          : isOverThreshold(baseTokens + estimateTokens(pass.assistantText), this.contextWindow)) {
+        if (contextBudget.shouldCompact(baseTokens + estimateTokens(pass.assistantText), estimateTokens(JSON.stringify(tools)))) {
           pass.overflowed = true;
           return;
         }
@@ -580,7 +573,7 @@ export class OpenRouterProvider implements ModelProvider {
           continue;
         }
 
-        const shellCommand = args.comand;
+        const shellCommand = args.command;
         if (typeof shellCommand === 'string') trackFileOps(state.fileOps, shellCommand);
 
         yield { type: 'tool_call', id: call.id, name: call.function.name, args };

@@ -179,8 +179,8 @@ describe('Postgres DATABASE_URL', () => {
     'postgresql://u:p@172.20.0.5/app',
     'postgresql://u:p@169.254.169.254/app',
     'postgresql://u:p@[::1]/app',
-    'postgresql://u:p@postgres:5432/lovable',
-    'postgresql://u:p@my-lovable-postgres-1/lovable',
+    'postgresql://u:p@postgres:5432/inkling',
+    'postgresql://u:p@my-lovable-postgres-1/inkling',
     'postgresql://u:p@db.internal/app',
   ];
   for (const url of internal) {

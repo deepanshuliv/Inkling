@@ -19,7 +19,7 @@ export function createMemoryStore(): MemoryStore {
 
   if (apiKey && baseUrl) {
     console.log('[MEMORY] using Redis Iris at', baseUrl);
-    store = new IrisMemory(baseUrl, apiKey, envOr('REDIS_IRIS_NAMESPACE', 'my-lovable'), RECENT_EVENTS_LIMIT);
+    store = new IrisMemory(baseUrl, apiKey, envOr('REDIS_IRIS_NAMESPACE', 'inkling'), RECENT_EVENTS_LIMIT);
   } else {
     console.log('[MEMORY] REDIS_IRIS_API_KEY/REDIS_IRIS_URL not set — using Redis session fallback');
     store = new RedisFallbackMemory(envInt('SESSION_TTL_SECONDS', 60 * 60 * 24 * 7), RECENT_EVENTS_LIMIT);

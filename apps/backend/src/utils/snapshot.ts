@@ -1,9 +1,12 @@
 import { prisma } from '@repo/db';
 import { ensureSeqAtLeast } from '@repo/redis';
-import { getObject, isStorageConfigured, putObject, snapshotKey } from '@repo/storage';
+import { envInt } from '@repo/shared';
+import { deleteObject, getObject, isStorageConfigured, putObject, snapshotKey } from '@repo/storage';
 import { executeCommand, type ProjectSandbox } from '../sandbox';
 
 const ARCHIVE_PATH = '/tmp/project-snapshot.tar.gz';
+
+export const SNAPSHOT_KEEP = Math.max(1, envInt('SNAPSHOT_KEEP', 3));
 
 export type SnapshotInfo = {
   r2Key: string;
@@ -49,7 +52,46 @@ export async function writeSnapshot(
   });
 
   console.log(`[SNAPSHOT] wrote ${key} (${sizeBytes} bytes) at seq ${upToSeq}`);
+
+  await pruneSnapshots(entry.projectId).catch((error) => {
+    console.log('[SNAPSHOT_PRUNE_FAILED] , ', String(error).slice(0, 200));
+  });
+
   return { r2Key: key, upToSeq, sizeBytes };
+}
+
+export async function pruneSnapshots(projectId: string, keep = SNAPSHOT_KEEP): Promise<number> {
+  if (!isStorageConfigured()) return 0;
+
+  const snapshots = await prisma.snapshot.findMany({
+    where: { projectId },
+    orderBy: { upToSeq: 'desc' },
+    select: { id: true, r2Key: true },
+  });
+  const keptKeys = new Set(snapshots.slice(0, keep).map((snapshot) => snapshot.r2Key));
+
+  let removed = 0;
+  for (const snapshot of snapshots.slice(keep)) {
+    try {
+      if (!keptKeys.has(snapshot.r2Key)) await deleteObject(snapshot.r2Key);
+      await prisma.snapshot.delete({ where: { id: snapshot.id } });
+      removed++;
+    } catch (error) {
+      console.log('[SNAPSHOT_DELETE_FAILED] , ', snapshot.r2Key, String(error).slice(0, 160));
+    }
+  }
+  return removed;
+}
+
+export async function deleteSnapshotObjects(projectId: string): Promise<void> {
+  if (!isStorageConfigured()) return;
+
+  const snapshots = await prisma.snapshot.findMany({ where: { projectId }, select: { r2Key: true } });
+  for (const snapshot of snapshots) {
+    await deleteObject(snapshot.r2Key).catch((error) => {
+      console.log('[SNAPSHOT_DELETE_FAILED] , ', snapshot.r2Key, String(error).slice(0, 160));
+    });
+  }
 }
 
 export async function restoreSnapshot(entry: ProjectSandbox): Promise<number | null> {

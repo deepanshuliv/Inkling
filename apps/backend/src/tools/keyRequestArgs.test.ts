@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { toolCall } from './toolDefintion';
+import { toolCall } from './toolDefinition';
 
 const parse = toolCall.request_api_keys;
 

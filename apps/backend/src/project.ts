@@ -31,7 +31,7 @@ import {
 import { commitBaseline, prepareWorkingTree } from './sandbox/git';
 import { ensureDevServer, provisionTemplate } from './sandbox/template';
 import { applySecretsToSandbox } from './utils/secrets';
-import { restoreSnapshot } from './utils/snapshot';
+import { deleteSnapshotObjects, restoreSnapshot } from './utils/snapshot';
 import { loadRecentEvents } from './utils/recentEvents';
 import type { RecentEvent } from '@repo/memory';
 
@@ -334,6 +334,8 @@ export async function deleteProject(projectId: string) {
   if (project.sandboxId) {
     await deleteDaytonaSandbox(project.sandboxId);
   }
+
+  await deleteSnapshotObjects(projectId);
 
   await prisma.project.delete({ where: { id: projectId } });
   await forgetProjectUser(projectId).catch(() => {});

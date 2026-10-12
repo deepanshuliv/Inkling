@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Geist_Mono, Sedgwick_Ave } from 'next/font/google';
 import localFont from 'next/font/local';
+import { STORAGE_BOOT } from '@/lib/storage';
 import { THEME_BOOT } from '@/lib/theme';
 import './globals.css';
 
@@ -109,7 +110,7 @@ const clerkAppearance = {
 
 function ClerkNotConfigured({ fonts }: { fonts: string }) {
   return (
-    <html lang="en" className={fonts}>
+    <html lang="en" dir="ltr" className={fonts}>
       <body className="font-sans">
         <main className="flex min-h-[100dvh] items-center justify-center p-6 text-center">
           <div className="max-w-md space-y-3">
@@ -130,8 +131,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <ClerkProvider appearance={clerkAppearance}>
-      <html lang="en" className={fonts} suppressHydrationWarning>
+      <html lang="en" dir="ltr" className={fonts} suppressHydrationWarning>
         <head>
+          <script dangerouslySetInnerHTML={{ __html: STORAGE_BOOT }} />
           <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         </head>
         <body className="font-sans">

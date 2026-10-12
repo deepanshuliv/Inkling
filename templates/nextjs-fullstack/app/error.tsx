@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-const TAG = 'my-lovable:client-errors';
+const TAG = 'inkling:client-errors';
 
 export default function ErrorBoundary({
   error,

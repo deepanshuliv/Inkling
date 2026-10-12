@@ -325,8 +325,8 @@ export function noCommandMatches(pattern: RegExp, name: string): Grader {
   return {
     name,
     check: (t) => {
-      const hits = t.toolCalls.filter((c) => c.name === 'bash_tool' && pattern.test(String(c.args.comand ?? c.args.command ?? '')));
-      return hits.length === 0 ? { pass: true } : fail(hits.map((h) => String(h.args.comand)).join(' | ').slice(0, 300));
+      const hits = t.toolCalls.filter((c) => c.name === 'bash_tool' && pattern.test(String(c.args.command ?? '')));
+      return hits.length === 0 ? { pass: true } : fail(hits.map((h) => String(h.args.command)).join(' | ').slice(0, 300));
     },
   };
 }
@@ -424,7 +424,7 @@ export const avoidsDefaultPalette: Grader = {
   },
 };
 
-const commandOf = (args: Record<string, any> | undefined) => String(args?.comand ?? args?.command ?? '');
+const commandOf = (args: Record<string, any> | undefined) => String(args?.command ?? '');
 
 export const firstTypecheckPasses: Grader = {
   name: 'the first typecheck after writing passes (code was right the first time)',

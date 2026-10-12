@@ -1,6 +1,6 @@
 'use client';
 
-import { DotsThree, ListBullets, MagnifyingGlass, PencilSimple, Plus, SquaresFour, Trash } from '@phosphor-icons/react';
+import { DotsThree, ListBullets, MagnifyingGlass, PencilSimple, SquaresFour, Trash } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listProjects, renameProject, deleteProject, type ProjectSummary } from '@/lib/api';
@@ -8,7 +8,7 @@ import { useToken } from '@/lib/useToken';
 import { artKind, artLabel } from './ProjectArt';
 import { LimeButton, Polaroid } from './lime';
 
-const VIEW_KEY = 'my-lovable.projects-view';
+const VIEW_KEY = 'inkling.projects-view';
 
 function editedLabel(iso: string): string {
   const then = new Date(iso).getTime();

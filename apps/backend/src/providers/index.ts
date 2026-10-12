@@ -10,8 +10,6 @@ export * from './types';
 export const DEFAULT_OPENROUTER_MODEL = 'deepseek/deepseek-v4-flash';
 export const DEFAULT_PLATFORM_MODEL = 'poolside/laguna-s-2.1:free';
 
-export const PLATFORM_FREE_ONLY = true;
-
 export function platformOptions(): OpenRouterOptions {
   return { freeOnly: true, limiter: freeRequestLimiter };
 }
@@ -33,11 +31,6 @@ let cached: ProviderChoice | null = null;
 
 function build(): ProviderChoice {
   const openrouterKey = process.env.OPENROUTER_API_KEY;
-  const forced = envOr('MODEL_PROVIDER', 'auto').toLowerCase();
-
-  if (forced !== 'auto' && forced !== 'openrouter') {
-    throw new Error(`platform credits only run on free OpenRouter models; MODEL_PROVIDER=${forced} is not allowed`);
-  }
   if (!openrouterKey) throw new Error('platform credits only run on free OpenRouter models; set OPENROUTER_API_KEY');
 
   return {
@@ -49,7 +42,7 @@ function build(): ProviderChoice {
       'openrouter',
       platformOptions(),
     ),
-    reason: forced === 'openrouter' ? 'MODEL_PROVIDER=openrouter' : 'OPENROUTER_API_KEY is set',
+    reason: 'OPENROUTER_API_KEY is set',
   };
 }
 
@@ -109,24 +102,12 @@ function buildFromOverride(override: ProviderOverride): ModelProvider {
   );
 }
 
-export function getProvider(override?: ProviderOverride, forcePlatformProvider?: 'openrouter' | 'gemini'): ModelProvider {
+export function getProvider(override?: ProviderOverride): ModelProvider {
   if (override?.apiKey) {
     const provider = buildFromOverride(override);
 
     console.log(`[MODEL] ${provider.name} / ${provider.model} (user-supplied key)`);
     return provider;
-  }
-
-  if (forcePlatformProvider) {
-    const originalEnv = process.env.MODEL_PROVIDER;
-    process.env.MODEL_PROVIDER = forcePlatformProvider;
-    try {
-      const choice = build();
-      console.log(`[MODEL] ${choice.provider.name} / ${choice.provider.model} (forced platform ${forcePlatformProvider})`);
-      return choice.provider;
-    } finally {
-      process.env.MODEL_PROVIDER = originalEnv;
-    }
   }
 
   const choice = build();

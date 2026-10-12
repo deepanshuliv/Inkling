@@ -9,7 +9,7 @@ type Viewport = 'desktop' | 'tablet' | 'mobile';
 
 export type ClientError = { level: 'error' | 'warn'; message: string; source: string };
 
-const PREVIEW_ERROR_TAG = 'my-lovable:client-errors';
+const PREVIEW_ERROR_TAGS = new Set(['inkling:client-errors', 'my-lovable:client-errors']);
 
 const WIDTHS: Record<Viewport, string> = {
   desktop: '100%',
@@ -151,7 +151,7 @@ export default function PreviewPanel({
       if (event.origin !== previewOrigin) return;
 
       const data = event.data as { source?: unknown; errors?: unknown } | null;
-      if (!data || data.source !== PREVIEW_ERROR_TAG) return;
+      if (!data || typeof data.source !== 'string' || !PREVIEW_ERROR_TAGS.has(data.source)) return;
       if (!Array.isArray(data.errors) || data.errors.length === 0) return;
 
       const cleaned = data.errors.slice(0, 20).map((raw): ClientError => {

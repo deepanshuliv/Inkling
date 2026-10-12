@@ -1,4 +1,4 @@
-import { envInt, envOr } from '@repo/shared';
+import { envInt } from '@repo/shared';
 import {
   formatFileOperations,
   SUMMARIZATION_PROMPT,
@@ -7,8 +7,6 @@ import {
 } from './prompts';
 
 export * from './prompts';
-
-const COMPACT_AT = Number(envOr('COMPACT_AT_FRACTION', '0.8'));
 
 const KEEP_RECENT_TOKENS = envInt('KEEP_RECENT_TOKENS', 20_000);
 
@@ -122,8 +120,4 @@ export function findCutPoint(parts: ConversationPart[], keepTokens = KEEP_RECENT
   }
 
   return 0;
-}
-
-export function isOverThreshold(usedTokens: number, contextWindow: number): boolean {
-  return usedTokens >= contextWindow * COMPACT_AT;
 }

@@ -80,15 +80,15 @@ describe('eval graders', () => {
     expect(await grade(declaresSecret(/^STRIPE_.*(SECRET|KEY)/), trial({ toolCalls: [deferredCall] }))).toBe(true);
     expect(await grade(declaresSecret(/^RESEND/), trial({ toolCalls: [deferredCall] }))).toBe(false);
     const rm = noCommandMatches(/rm\s+-rf?\s+(\.\/)?app\/?(\s|;|&|\||$)/, 'no rm');
-    expect(await grade(rm, trial({ toolCalls: [{ name: 'bash_tool', args: { comand: 'rm -rf app' } }] }))).toBe(false);
-    expect(await grade(rm, trial({ toolCalls: [{ name: 'bash_tool', args: { comand: 'rm -rf app-cache' } }] }))).toBe(true);
-    expect(await grade(rm, trial({ toolCalls: [{ name: 'bash_tool', args: { comand: 'rm -rf ./app/ && echo DONE' } }] }))).toBe(false);
+    expect(await grade(rm, trial({ toolCalls: [{ name: 'bash_tool', args: { command: 'rm -rf app' } }] }))).toBe(false);
+    expect(await grade(rm, trial({ toolCalls: [{ name: 'bash_tool', args: { command: 'rm -rf app-cache' } }] }))).toBe(true);
+    expect(await grade(rm, trial({ toolCalls: [{ name: 'bash_tool', args: { command: 'rm -rf ./app/ && echo DONE' } }] }))).toBe(false);
     expect(await grade(finalTextMatches(/\b30000\b/), trial({ finalText: 'The last line was 30000.' }))).toBe(true);
     expect(await grade(finalTextMatches(/\b30000\b/), trial({ finalText: 'It ended at 300001' }))).toBe(false);
   });
 
   test('firstTypecheckPasses looks at the first typecheck result only', async () => {
-    const call = (comand: string) => ({ type: 'tool_call', name: 'bash_tool', args: { comand } });
+    const call = (command: string) => ({ type: 'tool_call', name: 'bash_tool', args: { command } });
     const result = (isError: boolean) => ({ type: 'tool_result', name: 'bash_tool', isError, result: isError ? 'ERROR: exit 2 TS2304' : 'ok' });
     expect(await grade(firstTypecheckPasses, trial({ events: [call('npm run typecheck'), result(false), { type: 'done' }] }))).toBe(true);
     expect(await grade(firstTypecheckPasses, trial({ events: [call('ls'), result(true), call('npm run typecheck && tail -n 30 /tmp/dev-server.log'), result(true), call('npm run typecheck'), result(false)] }))).toBe(false);
@@ -109,7 +109,7 @@ describe('eval graders', () => {
   });
 
   test('noStrayCd catches guessed roots but allows subfolders', async () => {
-    const bash = (comand: string) => trial({ toolCalls: [{ name: 'bash_tool', args: { comand } }] });
+    const bash = (command: string) => trial({ toolCalls: [{ name: 'bash_tool', args: { command } }] });
     expect(await grade(noStrayCd, bash('cd /workspace && npm run typecheck'))).toBe(false);
     expect(await grade(noStrayCd, bash('cd ~/project && ls'))).toBe(false);
     expect(await grade(noStrayCd, bash('cd app/api && ls'))).toBe(true);

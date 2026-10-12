@@ -1,4 +1,4 @@
-import type { RequiredSecret } from './tools/toolDefintion';
+import type { RequiredSecret } from './tools/toolDefinition';
 
 export const EDIT_FAILURES_BEFORE_REWRITE = 2;
 export const CONSECUTIVE_FAILURES_BEFORE_REASSESS = 4;
@@ -20,7 +20,7 @@ export class FailureTracker {
 
   observe(name: string, args: Record<string, unknown>, result: string): string | null {
     const failed = result.startsWith('ERROR');
-    const commandText = typeof args.comand === 'string' ? args.comand : typeof args.command === 'string' ? args.command : null;
+    const commandText = typeof args.command === 'string' ? args.command : null;
     if (name === 'write_file' || name === 'edit_file') {
       this.lastSuccessfulCommand = null;
       this.unchangedRepeats = 0;
@@ -52,7 +52,7 @@ export class FailureTracker {
       }
     }
 
-    const command = typeof args.comand === 'string' ? args.comand : typeof args.command === 'string' ? args.command : null;
+    const command = typeof args.command === 'string' ? args.command : null;
     if (name === 'bash_tool' && command) {
       const key = normaliseCommand(command);
       const count = (this.commandFailures.get(key) ?? 0) + 1;

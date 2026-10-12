@@ -147,12 +147,12 @@ const bashTool: ToolSpec = {
   parameters: {
     type: 'object',
     properties: {
-      comand: {
+      command: {
         type: 'string',
-        description: 'comand to execute in terminal',
+        description: 'command to execute in terminal',
       },
     },
-    required: ['comand'],
+    required: ['command'],
   },
 };
 

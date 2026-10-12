@@ -4,8 +4,6 @@ export type ByokProvider = 'openrouter' | 'openai' | 'anthropic' | 'gemini' | 'd
 
 export type ByokModel = { id: string; label: string; note: string; recommended: boolean };
 
-const SKIP_KEY = 'my-lovable.byok.skipped';
-
 export const PROVIDERS: { id: ByokProvider; label: string; blurb: string; keyUrl: string; placeholder: string }[] = [
   {
     id: 'openrouter',
@@ -79,17 +77,7 @@ export function isByokProvider(value: unknown): value is ByokProvider {
   return PROVIDERS.some((item) => item.id === value);
 }
 
-export function markByokSkipped() {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(SKIP_KEY, '1');
-}
-
-export function hasSkippedByok(): boolean {
-  if (typeof window === 'undefined') return true;
-  return localStorage.getItem(SKIP_KEY) === '1';
-}
-
-const PREFERENCE_KEY = 'my-lovable.provider.preference';
+const PREFERENCE_KEY = 'inkling.provider.preference';
 
 export type ProviderPreference = {
   provider: ByokProvider;

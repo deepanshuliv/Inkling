@@ -21,13 +21,13 @@ function withEnv(env: Record<string, string | undefined>, fn: () => void) {
 describe('the platform key can only reach free models', () => {
   test('a paid OPENROUTER_MODEL is refused instead of silently spending', () => {
     withEnv({ OPENROUTER_API_KEY: 'k', OPENROUTER_MODEL: 'deepseek/deepseek-v4-flash' }, () => {
-      expect(() => getProvider(undefined, 'openrouter')).toThrow(/free/);
+      expect(() => getProvider()).toThrow(/free/);
     });
   });
 
   test('the default platform model is the free Laguna', () => {
     withEnv({ OPENROUTER_API_KEY: 'k', OPENROUTER_MODEL: undefined }, () => {
-      expect(getProvider(undefined, 'openrouter').model).toBe('poolside/laguna-s-2.1:free');
+      expect(getProvider().model).toBe('poolside/laguna-s-2.1:free');
     });
   });
 
@@ -43,15 +43,17 @@ describe('the platform key can only reach free models', () => {
     });
   });
 
-  test('Gemini cannot be forced as the platform model even with an OpenRouter key present', () => {
-    withEnv({ OPENROUTER_API_KEY: 'k', GEMINI_API_KEY: 'g', MODEL_PROVIDER: 'gemini' }, () => {
-      expect(() => getProvider()).toThrow(/free/);
+  test('Gemini cannot become the platform model even with an OpenRouter key present', () => {
+    withEnv({ OPENROUTER_API_KEY: 'k', GEMINI_API_KEY: 'g', MODEL_PROVIDER: 'gemini', OPENROUTER_MODEL: undefined }, () => {
+      const provider = getProvider();
+      expect(provider.name).toBe('openrouter');
+      expect(provider.model.endsWith(':free')).toBe(true);
     });
   });
 
   test('the free-only rule cannot be switched off from the environment', () => {
     withEnv({ OPENROUTER_API_KEY: 'k', PLATFORM_FREE_ONLY: 'off', OPENROUTER_MODEL: 'deepseek/deepseek-v4-flash' }, () => {
-      expect(() => getProvider(undefined, 'openrouter')).toThrow(/free/);
+      expect(() => getProvider()).toThrow(/free/);
     });
   });
 

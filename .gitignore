@@ -136,3 +136,6 @@ next-env.d.ts
 evals/results/
 
 !templates/nextjs-fullstack/.agents
+
+demo-video/
+/skills-lock.json

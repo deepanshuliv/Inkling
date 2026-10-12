@@ -5,7 +5,6 @@ import { useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ChatPanel from '@/components/ChatPanel';
 import PreviewPanel from '@/components/PreviewPanel';
-import { LogoMark } from '@/components/lime';
 import { START_PROGRESS, type BuildProgress } from '@/lib/phase';
 import type { ChatItem } from '@/lib/types';
 

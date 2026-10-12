@@ -293,8 +293,6 @@ Name the thing you are least certain about. That sentence is usually worth more 
 End with the plan itself, then tell the user to switch to Build mode to have it implemented. Do not attempt to implement it yourself, and do not ask to be switched over — the user decides that.
 `.trim();
 
-export const SYSTEM_PROMPT = BUILD_SYSTEM_PROMPT;
-
 export type AgentMode = 'plan' | 'build';
 
 export function promptForMode(mode: AgentMode): string {

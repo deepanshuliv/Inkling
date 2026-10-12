@@ -3,7 +3,6 @@ import {
   createFileOps,
   estimateTokens,
   findCutPoint,
-  isOverThreshold,
   summarize,
   trackFileOps,
   type ConversationPart,
@@ -11,13 +10,6 @@ import {
 } from '../compaction';
 import { addUsage, createUsage, looksLikeError, type ModelProvider, type ProviderEvent, type RunOptions, type ToolSpec } from './types';
 import { normalizeToolArgs } from './wire';
-
-let client: GoogleGenAI | null = null;
-
-function getClient(): GoogleGenAI {
-  if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  return client;
-}
 
 function toGeminiTools(tools: ToolSpec[]): any[] {
   return tools.map((tool) => ({
@@ -38,7 +30,7 @@ export class GeminiProvider implements ModelProvider {
   readonly name = 'gemini' as const;
   readonly model: string;
   readonly contextWindow: number;
-    private readonly ownClient: GoogleGenAI | null;
+    private readonly ownClient: GoogleGenAI;
 
   readonly usage = createUsage();
 
@@ -46,19 +38,18 @@ export class GeminiProvider implements ModelProvider {
     if (usage) addUsage(this.usage, usage.total_input_tokens ?? 0, usage.total_output_tokens ?? 0);
   }
 
-  constructor(model: string, contextWindow = 1_000_000, apiKey?: string) {
+  constructor(model: string, contextWindow: number, apiKey: string) {
     this.model = model;
     this.contextWindow = contextWindow;
-    this.ownClient = apiKey ? new GoogleGenAI({ apiKey }) : null;
+    this.ownClient = new GoogleGenAI({ apiKey });
   }
 
   private client(): GoogleGenAI {
-    return this.ownClient ?? getClient();
+    return this.ownClient;
   }
 
   private requestFits(transcript: ConversationPart[], tools: ToolSpec[], budget: RunOptions['contextBudget']): boolean {
     const inputTokens = transcript.reduce((total, part) => total + estimateTokens(part.content), 0);
-    if (!budget) return !isOverThreshold(inputTokens, this.contextWindow);
     return !budget.shouldCompact(inputTokens, estimateTokens(JSON.stringify(tools)));
   }
 
@@ -124,10 +115,7 @@ export class GeminiProvider implements ModelProvider {
     budget: RunOptions['contextBudget'],
   ): AsyncGenerator<ProviderEvent, string | null> {
     const used = () => state.transcript.reduce((n, p) => n + estimateTokens(p.content), 0);
-    const needsCompaction = budget
-      ? budget.shouldCompact(used(), estimateTokens(JSON.stringify(tools)))
-      : isOverThreshold(used(), this.contextWindow);
-    if (!needsCompaction) return null;
+    if (!budget.shouldCompact(used(), estimateTokens(JSON.stringify(tools)))) return null;
 
     let restart = yield* this.compact(state, midStream, false);
 
@@ -225,7 +213,7 @@ export class GeminiProvider implements ModelProvider {
             continue;
           }
 
-          if (typeof args.comand === 'string') trackFileOps(state.fileOps, args.comand);
+          if (typeof args.command === 'string') trackFileOps(state.fileOps, args.command);
           state.transcript.push({ role: 'assistant', content: `[tool_call ${call.name}] ${JSON.stringify(args)}` });
 
           yield { type: 'tool_call', id: call.id, name: call.name, args };
@@ -253,9 +241,7 @@ export class GeminiProvider implements ModelProvider {
 
           const running =
             state.transcript.reduce((n, p) => n + estimateTokens(p.content), 0) + estimateTokens(assistantText);
-          if (contextBudget
-            ? contextBudget.shouldCompact(running, estimateTokens(JSON.stringify(tools)))
-            : isOverThreshold(running, this.contextWindow)) {
+          if (contextBudget.shouldCompact(running, estimateTokens(JSON.stringify(tools)))) {
             overflowedMidStream = true;
             break;
           }

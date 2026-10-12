@@ -22,7 +22,7 @@ async function main() {
   const exists = await stat(source).then((s) => s.isDirectory(), () => false);
   if (!exists) throw new Error(`template not found: ${source}`);
 
-  const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY || process.env.DAYTON_API_KEY });
+  const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY });
 
   console.log('▸ creating a sandbox to bake in');
   const sandbox = await daytona.create({ language: 'typescript', labels: { env: 'bake' } });

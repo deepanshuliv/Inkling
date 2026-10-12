@@ -6,12 +6,6 @@ export type MemoryMessage = {
   createdAt?: string;
 };
 
-export type LongTermMemory = {
-  text: string;
-    score?: number;
-  topics?: string[];
-};
-
 export type RecentEvent = {
   seq: number;
   type: string;
@@ -26,10 +20,6 @@ export interface MemoryStore {
   appendMessages(projectId: string, messages: MemoryMessage[]): Promise<void>;
 
   getSessionHistory(projectId: string, limit: number): Promise<MemoryMessage[]>;
-
-    searchLongTerm(projectId: string, query: string, limit: number): Promise<LongTermMemory[]>;
-
-    rememberFact(projectId: string, text: string, topics?: string[]): Promise<void>;
 
   clearSession(projectId: string): Promise<void>;
 

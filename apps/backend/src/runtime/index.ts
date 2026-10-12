@@ -3,7 +3,7 @@ import type { ModelProvider, ToolSpec } from '../providers/types';
 import type { Emitter } from '../utils/events';
 import { envInt } from '@repo/shared';
 import { CompactionManager, createModelSummaryGenerator } from './compactionManager';
-import { ContextBudgetManager, type ContextBudgetReport } from './contextBudget';
+import { ContextBudgetManager } from './contextBudget';
 import { ContextManager, type ActiveContext } from './contextManager';
 import { createEmitterEventStore, EventStore } from './eventStore';
 import { HistoryRetriever, PrismaEventReader } from './historyRetriever';
@@ -141,10 +141,6 @@ export class AgentRuntime {
       return `${result.slice(0, 8_000)}\n… [tool output shortened because durable output storage failed]`;
     }
   }
-
-  budgetReport(active: ActiveContext): ContextBudgetReport {
-    return active.budget;
-  }
 }
 
 export * from './compactionManager';
@@ -152,7 +148,6 @@ export * from './contextBudget';
 export * from './contextManager';
 export * from './eventStore';
 export * from './historyRetriever';
-export * from './subagentContext';
 export * from './summary';
 export * from './taskState';
 export * from './toolOutput';
