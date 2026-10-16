@@ -1,0 +1,91 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/docker/bun.Dockerfile
+    command: ['bun', 'packages/db/migrate.ts']
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the Neon direct connection string}
+
+  backend:
+    build:
+      context: .
+      dockerfile: infra/docker/bun.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      BACKEND_ID: backend-1
+      PORT: 8000
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the Neon direct connection string}
+      REDIS_URL: redis://redis:6379
+      PREVIEW_PROXY_URL: ${PREVIEW_PROXY_URL:-off}
+      NODE_ENV: production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/bun.Dockerfile
+    command: ['bun', 'apps/worker/index.ts']
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      WORKER_ID: worker-1
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the Neon direct connection string}
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.prod.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL to the public https address}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        NEXT_PUBLIC_CREDITS_REQUEST_EMAIL: ${NEXT_PUBLIC_CREDITS_REQUEST_EMAIL:-}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${GATEWAY_PORT:-8080}:8080'
+    volumes:
+      - ./infra/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - web
+
+volumes:
+  redis-data:
