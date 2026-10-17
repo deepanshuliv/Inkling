@@ -57,7 +57,7 @@ export async function isSandboxAsleep(response: Response): Promise<boolean> {
   if (response.status < 400 || response.status === 401 || response.status === 403 || response.status === 404) return false;
   if (!(response.headers.get('content-type') ?? '').includes('json')) return false;
   const body = await response.clone().text().catch(() => '');
-  return /SANDBOX_NOT_RUNNING|SANDBOX_(STOPPED|ARCHIVED|NOT_STARTED)|Is the Sandbox started|sandbox is (stopped|archived|not running|starting)/i.test(body);
+  return /SANDBOX_NOT_RUNNING|SANDBOX_(STOPPED|ARCHIVED|NOT_STARTED)|Is the Sandbox started|sandbox is (stopped|archived|not running|starting)|does not have a runner/i.test(body);
 }
 
 type SocketData = { upstreamUrl: string; headers: Record<string, string>; protocols: string[]; upstream?: WebSocket; queue: (string | Buffer)[] };

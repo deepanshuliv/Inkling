@@ -14,6 +14,15 @@ describe('isSandboxAsleep', () => {
     expect(await isSandboxAsleep(response)).toBe(true);
   });
 
+  test("Daytona's real sandbox-without-runner response", async () => {
+    const response = json(400, {
+      statusCode: 400,
+      message: 'bad request: sandbox 72235023-465c-4d99-8b90-6a26f6662a58 does not have a runner',
+      code: 'BAD_REQUEST',
+    });
+    expect(await isSandboxAsleep(response)).toBe(true);
+  });
+
   test('other stopped or archived wordings', async () => {
     expect(await isSandboxAsleep(json(409, { message: 'Sandbox is archived' }))).toBe(true);
     expect(await isSandboxAsleep(json(503, { code: 'SANDBOX_STOPPED' }))).toBe(true);
