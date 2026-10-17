@@ -24,6 +24,8 @@ services:
       context: .
       dockerfile: infra/docker/bun.Dockerfile
     restart: unless-stopped
+    ports:
+      - '127.0.0.1:${PREVIEW_HOST_PORT:-8081}:8001'
     env_file:
       - path: .env
         required: false
