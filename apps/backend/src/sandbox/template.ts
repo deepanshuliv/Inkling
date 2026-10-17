@@ -103,7 +103,7 @@ const PROBE = `node -e "fetch('http://127.0.0.1:${PREVIEW_PORT}').then(r=>consol
 
 async function probeDevServer(entry: ProjectSandbox): Promise<boolean> {
   const probe = await executeCommand(entry.projectId, PROBE);
-  return probe.output.includes('HTTP2') || probe.output.includes('HTTP3');
+  return /HTTP[1-5]\d\d/.test(probe.output);
 }
 
 async function startDevServer(entry: ProjectSandbox): Promise<boolean> {
