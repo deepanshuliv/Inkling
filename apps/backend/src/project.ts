@@ -344,14 +344,39 @@ export async function deleteProject(projectId: string) {
   console.log('[PROJECT_DELETED] , ', projectId);
 }
 
+async function startedSandbox(projectId: string): Promise<ProjectSandbox | null> {
+  const cached = getCachedSandbox(projectId);
+  if (cached) return cached;
+  const sandboxId = await knownSandboxId(projectId);
+  const sandbox = sandboxId ? await peekSandbox(sandboxId) : null;
+  if (!sandbox || sandbox.state !== 'started') return null;
+  return await registerSandbox(projectId, sandbox);
+}
+
+const revivals = new Map<string, Promise<boolean>>();
+
+export function reviveDevServer(projectId: string): Promise<boolean> {
+  const running = revivals.get(projectId);
+  if (running) return running;
+  const revival = (async () => {
+    const entry = await startedSandbox(projectId);
+    if (!entry) return false;
+    const up = await ensureDevServer(entry);
+    console.log('[DEV_SERVER_REVIVED] , ', projectId, up);
+    return up;
+  })()
+    .catch((error) => {
+      console.log('[DEV_SERVER_REVIVE_FAILED] , ', projectId, String(error).slice(0, 160));
+      return false;
+    })
+    .finally(() => revivals.delete(projectId));
+  revivals.set(projectId, revival);
+  return revival;
+}
+
 export async function runScriptInProject(projectId: string, script: string): Promise<string | null> {
-  let entry = getCachedSandbox(projectId);
-  if (!entry) {
-    const sandboxId = await knownSandboxId(projectId);
-    const sandbox = sandboxId ? await peekSandbox(sandboxId) : null;
-    if (!sandbox || sandbox.state !== 'started') return null;
-    entry = await registerSandbox(projectId, sandbox);
-  }
+  const entry = await startedSandbox(projectId);
+  if (!entry) return null;
   const path = `/tmp/probe-${randomUUIDv7()}.cjs`;
   await entry.sandbox.fs.uploadFile(Buffer.from(script), path);
   const result = await executeCommand(projectId, `node ${path}; rm -f ${path}`);

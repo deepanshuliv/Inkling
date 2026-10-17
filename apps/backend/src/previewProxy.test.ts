@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { isSandboxAsleep } from './previewProxy';
+import { isDevServerDown, isSandboxAsleep } from './previewProxy';
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -44,5 +44,32 @@ describe('isSandboxAsleep', () => {
     const response = json(400, { error: 'email is required' });
     await isSandboxAsleep(response);
     expect(await response.json()).toEqual({ error: 'email is required' });
+  });
+});
+
+describe('isDevServerDown', () => {
+  test("Daytona's real nothing-listening-on-the-port response", async () => {
+    const response = json(502, {
+      statusCode: 502,
+      message: 'proxy upstream error',
+      source: 'DAYTONA_DAEMON',
+      timestamp: '2026-10-17T05:46:16.087895835Z',
+      path: '/',
+      method: 'GET',
+    });
+    expect(await isDevServerDown(response)).toBe(true);
+    expect(await isSandboxAsleep(response)).toBe(false);
+  });
+
+  test("the app's own errors are passed through untouched", async () => {
+    expect(await isDevServerDown(json(502, { error: 'payment gateway unreachable' }))).toBe(false);
+    expect(await isDevServerDown(json(500, { source: 'DAYTONA_DAEMON' }))).toBe(false);
+    expect(await isDevServerDown(json(200, { message: 'proxy upstream error' }))).toBe(false);
+  });
+
+  test('the response body is still readable afterwards', async () => {
+    const response = json(502, { error: 'bad gateway' });
+    await isDevServerDown(response);
+    expect(await response.json()).toEqual({ error: 'bad gateway' });
   });
 });

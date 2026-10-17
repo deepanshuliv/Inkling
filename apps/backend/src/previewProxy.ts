@@ -60,9 +60,15 @@ export async function isSandboxAsleep(response: Response): Promise<boolean> {
   return /SANDBOX_NOT_RUNNING|SANDBOX_(STOPPED|ARCHIVED|NOT_STARTED)|Is the Sandbox started|sandbox is (stopped|archived|not running|starting)|does not have a runner/i.test(body);
 }
 
+export async function isDevServerDown(response: Response): Promise<boolean> {
+  if (response.status !== 502) return false;
+  const body = await response.clone().text().catch(() => '');
+  return /DAYTONA_DAEMON|proxy upstream error/i.test(body);
+}
+
 type SocketData = { upstreamUrl: string; headers: Record<string, string>; protocols: string[]; upstream?: WebSocket; queue: (string | Buffer)[] };
 
-export function startPreviewProxy() {
+export function startPreviewProxy(reviveDevServer?: (projectId: string) => unknown) {
   if (!proxiedPreviewUrl('x')) return null;
 
   let server: ReturnType<typeof Bun.serve<SocketData>>;
@@ -115,6 +121,10 @@ export function startPreviewProxy() {
         }
 
         if (await isSandboxAsleep(response)) return waitingPage('Waking up your preview…');
+        if (await isDevServerDown(response)) {
+          reviveDevServer?.(projectId);
+          return notReady();
+        }
 
         const out = new Headers(response.headers);
         out.delete('content-encoding');

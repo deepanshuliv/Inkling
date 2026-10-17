@@ -44,6 +44,7 @@ import {
   loadEventsSince,
   loadHistory,
   renameProject,
+  reviveDevServer,
 } from './src/project';
 import { getCachedSandbox, isSandboxConfigured } from './src/sandbox';
 import { restartDevServer } from './src/sandbox/template';
@@ -94,7 +95,7 @@ function openEventStream(res: Response) {
 await connectToRedis();
 const memory = createMemoryStore();
 startReconciler();
-startPreviewProxy();
+startPreviewProxy(reviveDevServer);
 
 console.log(`[BOOT] backend ${BACKEND_ID}`);
 
